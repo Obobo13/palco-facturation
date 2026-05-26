@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PALCO Facturation v1.4</title>
+<title>PALCO Facturation v1.5</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -284,7 +284,7 @@ input[type=number]::-webkit-inner-spin-button{opacity:.5}
     <div class="sb-logo">
       <img id="logo-app" alt="PALCO">
       <div class="name">PALCO Inc</div>
-      <div class="sub">Facturation v1.4</div>
+      <div class="sub">Facturation v1.5</div>
     </div>
     <div class="sb-nav">
       <button class="sb-btn active" onclick="nav('dashboard')" id="nav-dashboard"><span class="sb-icon">⊞</span>Tableau de bord</button>
@@ -1025,11 +1025,11 @@ function itemRow(it,i){
       onfocus="this.style.borderColor='#C5C0B5'" onblur="this.style.borderColor='transparent'"
       onchange="updateItem('${it.id}','desc',this.value)" oninput="updateItem('${it.id}','desc',this.value)"></td>
     <td class="center"><input type="number" value="${it.qty}" min="0" style="text-align:center"
-      onchange="updateItem('${it.id}','qty',this.value);updateLineTotal('${it.id}')"
-      oninput="updateItem('${it.id}','qty',this.value);updateLineTotal('${it.id}')"></td>
+      onchange="updateItem('${it.id}','qty',this.value)"
+      oninput="updateItem('${it.id}','qty',this.value)"></td>
     <td class="right"><input type="number" value="${it.price}" min="0" step="0.01" style="text-align:right"
-      onchange="updateItem('${it.id}','price',this.value);updateLineTotal('${it.id}')"
-      oninput="updateItem('${it.id}','price',this.value);updateLineTotal('${it.id}')"></td>
+      onchange="updateItem('${it.id}','price',this.value)"
+      oninput="updateItem('${it.id}','price',this.value)"></td>
     <td class="center"><input type="number" value="${it.tva||0}" min="0" max="100" style="text-align:center"
       onchange="updateItem('${it.id}','tva',this.value)" oninput="updateItem('${it.id}','tva',this.value)"></td>
     <td class="total-cell" id="lt-${it.id}">${eur(lineTotal)}</td>
@@ -1054,30 +1054,39 @@ function itemRow(it,i){
 
 function updateItem(id,key,val){
   const it=formState.items.find(i=>i.id===id);
-  if(it) it[key]=val;
+  if(!it) return;
+  it[key]=val;
+  // Mise à jour immédiate du total de ligne si qty ou price changent
+  if(key==='qty'||key==='price'){
+    const cell=document.getElementById('lt-'+id);
+    if(cell) cell.textContent=eur((parseFloat(it.qty)||0)*(parseFloat(it.price)||0));
+  }
   updateTotalDisplay();
 }
-function updateLineTotal(id){
-  const it=formState.items.find(i=>i.id===id);
-  if(!it)return;
-  const el=document.getElementById('lt-'+id);
-  if(el) el.textContent=eur((parseFloat(it.qty)||0)*(parseFloat(it.price)||0));
-  updateTotalDisplay();
-}
+
 function updateTotalDisplay(){
   const el=document.getElementById('items-total');
   if(el) el.textContent='Total : '+eur(total(formState.items));
 }
 
-function addItem(){
-  const it={id:uid(),desc:'',detail:'',qty:1,price:0,tva:0};
-  formState.items.push(it);
+function refreshItemsTbody(){
   const tbody=document.getElementById('items-tbody');
-  if(!tbody)return;
-  const tmp=document.createElement('tbody');
-  tmp.innerHTML=itemRow(it,0);
-  while(tmp.firstChild) tbody.appendChild(tmp.firstChild);
+  if(!tbody) return;
+  // Re-render complet depuis formState (source de vérité unique)
+  tbody.innerHTML=formState.items.map((it,i)=>itemRow(it,i)).join('');
+}
+
+function addItem(){
+  formState.items.push({id:uid(),desc:'',detail:'',qty:1,price:0,tva:0});
+  refreshItemsTbody();
   updateTotalDisplay();
+  // Mettre le focus sur le nouveau libellé
+  const rows=document.querySelectorAll('#items-tbody tr[id^="irow-"]:not([id*="detail"])');
+  if(rows.length){
+    const last=rows[rows.length-1];
+    const inp=last.querySelector('input');
+    if(inp) inp.focus();
+  }
 }
 
 function createRowEl(it){
@@ -1091,10 +1100,7 @@ function createRowEl(it){
 function removeItem(id){
   if(formState.items.length<=1)return;
   formState.items=formState.items.filter(i=>i.id!==id);
-  ['irow-'+id,'irow-detail-'+id].forEach(rid=>{
-    const el=document.getElementById(rid);
-    if(el)el.remove();
-  });
+  refreshItemsTbody();
   updateTotalDisplay();
 }
 
