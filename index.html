@@ -58,8 +58,9 @@ input[type=number]::-webkit-inner-spin-button{opacity:.5}
   #sidebar.open{left:0}
   #main{padding:56px 14px 20px!important;overflow-x:hidden}
   .stats-grid{grid-template-columns:1fr 1fr!important;gap:10px!important}
-  /* Dashboard 1 colonne */
+  /* Dashboard : 1 colonne, quick-actions en 2x2 */
   #dash-grid{grid-template-columns:1fr!important}
+  #quick-actions{display:grid!important;grid-template-columns:1fr 1fr!important;gap:10px!important}
   /* Tables scrollables horizontalement */
   #page-quotes .doc-table,#page-invoices .doc-table{overflow-x:auto;-webkit-overflow-scrolling:touch;display:block}
   .doc-table table{min-width:600px}
@@ -309,7 +310,7 @@ input[type=number]::-webkit-inner-spin-button{opacity:.5}
     <div class="sb-logo">
       <img id="logo-app" alt="PALCO">
       <div class="name">PALCO Inc</div>
-      <div class="sub">Facturation v1.9</div>
+      <div class="sub">Facturation v2.0</div>
     </div>
     <div class="sb-nav">
       <button class="sb-btn active" onclick="nav('dashboard')" id="nav-dashboard"><span class="sb-icon">⊞</span>Tableau de bord</button>
@@ -754,7 +755,7 @@ function renderDashboard(){
               </div>
             </div>`).join('')}
       </div>
-      <div style="display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;flex-direction:column;gap:10px" id="quick-actions">
         <button class="quick-action" onclick="openModal('quote')">
           <span class="qa-icon">◇</span>
           <div><div class="qa-title">Nouveau devis</div><div class="qa-sub">Créer un devis client</div></div>
@@ -1451,6 +1452,23 @@ function closeSidebar(){
   document.getElementById('sidebar')?.classList.remove('open');
   document.getElementById('sidebar-overlay')?.classList.remove('open');
 }
+
+// ══════════════════════════════ FAVICON ══════════════════════════════
+(function(){
+  try{
+    const c=document.createElement('canvas');
+    c.width=c.height=64;const x=c.getContext('2d');
+    x.fillStyle='#1A1A2E';x.beginPath();
+    x.roundRect(0,0,64,64,12);x.fill();
+    x.fillStyle='#C5962E';x.font='bold 46px sans-serif';
+    x.textAlign='center';x.textBaseline='middle';x.fillText('P',32,35);
+    const png=c.toDataURL('image/png');
+    document.querySelectorAll("link[rel*='icon']").forEach(l=>l.href=png);
+    let atl=document.querySelector("link[rel='apple-touch-icon']");
+    if(!atl){atl=document.createElement('link');atl.rel='apple-touch-icon';document.head.appendChild(atl);}
+    atl.href=png;
+  }catch(e){}
+})();
 
 // ══════════════════════════════ INIT ══════════════════════════════
 window.addEventListener('load',()=>{
