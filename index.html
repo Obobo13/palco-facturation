@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PALCO Facturation v1.5</title>
+<title>PALCO Facturation v1.6</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -284,7 +284,7 @@ input[type=number]::-webkit-inner-spin-button{opacity:.5}
     <div class="sb-logo">
       <img id="logo-app" alt="PALCO">
       <div class="name">PALCO Inc</div>
-      <div class="sub">Facturation v1.5</div>
+      <div class="sub">Facturation v1.6</div>
     </div>
     <div class="sb-nav">
       <button class="sb-btn active" onclick="nav('dashboard')" id="nav-dashboard"><span class="sb-icon">⊞</span>Tableau de bord</button>
@@ -626,17 +626,16 @@ const fmtDate=s=>s?new Date(s+'T12:00:00').toLocaleDateString('fr-FR'):'—';
 const eur=n=>new Intl.NumberFormat('fr-FR',{style:'currency',currency:'EUR'}).format(n||0);
 const total=items=>(items||[]).reduce((s,i)=>s+(parseFloat(i.qty)||0)*(parseFloat(i.price)||0),0);
 const nextNum=(type,date)=>{
+  const d=date?new Date(date+'T12:00:00'):new Date();
+  const mm=String(d.getMonth()+1).padStart(2,'0');
   if(type==='quote'){
-    const d=date?new Date(date+'T12:00:00'):new Date();
-    const mm=String(d.getMonth()+1).padStart(2,'0');
-    const k='q_'+d.getFullYear()+mm;
-    counters[k]=(counters[k]||0)+1;
-    persist();
-    return 'Devis '+mm+String(counters[k]).padStart(2,'0');
+    counters.quote=(counters.quote||0)+1;
+    // Format Dnnnmm : D + 3 chiffres séquentiels globaux + mois 2 chiffres
+    return 'D'+String(counters.quote).padStart(3,'0')+mm;
   }
   counters.invoice=(counters.invoice||0)+1;
-  persist();
-  return 'Facture '+String(counters.invoice).padStart(4,'0');
+  // Format nnmm : 2 chiffres séquentiels + mois 2 chiffres
+  return String(counters.invoice).padStart(2,'0')+mm;
 };
 
 const Q_STATUS={
@@ -919,16 +918,21 @@ function openModal(type,docId){
   const titles={quote:isEdit?'Modifier le devis':'Nouveau devis',invoice:isEdit?'Modifier la facture':'Nouvelle facture'};
   document.getElementById('modal-title').textContent=titles[type];
 
+  const initDate=data?.date||todayStr();
+  // Pré-générer le numéro (modifiable par l'utilisateur dans le formulaire)
+  const autoNum=data?.number||nextNum(type,initDate);
+  if(!data) persist(); // Sauvegarder le compteur incrémenté
   formState={
     type,docId,
-    date:data?.date||todayStr(),
+    number:autoNum,       // Numéro pré-rempli, éditable
+    date:initDate,
     validUntil:data?.validUntil||addDays(30),
     dueDate:data?.dueDate||addDays(settings.terms?.paymentDays||30),
     status:data?.status||'draft',
     refQuote:data?.refQuote||'',
     client:{name:'',address:'',zip:'',city:'',email:'',phone:'',...(data?.client||{})},
     items:data?.items?.length?data.items.map(i=>(({...i,id:i.id||uid()}))):
-      [{id:uid(),desc:'',qty:1,price:0,tva:0}],
+      [{id:uid(),desc:'',detail:'',qty:1,price:0,tva:0}],
     notes:data?.notes||''
   };
   renderForm();
@@ -947,6 +951,14 @@ function renderForm(){
   document.getElementById('modal-body').innerHTML=`
     <div>
       <div class="grid grid-4" style="margin-bottom:18px">
+        <label class="field">
+          <span>Numéro</span>
+          <input id="f-number" value="${f.number||''}"
+            style="font-family:monospace;font-weight:600;letter-spacing:.5px"
+            onchange="formState.number=this.value.trim()"
+            oninput="formState.number=this.value.trim()"
+            placeholder="${isInv?'0105':'D00105'}">
+        </label>
         <label class="field"><span>Date</span><input type="date" id="f-date" value="${f.date}" onchange="formState.date=this.value"></label>
         ${isInv
           ?`<label class="field"><span>Échéance</span><input type="date" id="f-due" value="${f.dueDate}" onchange="formState.dueDate=this.value"></label>`
@@ -1118,7 +1130,8 @@ function submitForm(){
     else invoices=invoices.map(i=>i.id===f.docId?{...i,...payload}:i);
   }else{
     const initStatus=f.type==='invoice'?'en_cours':'draft';
-    const docNum=nextNum(f.type, f.date);
+    // Utiliser le numéro saisi/modifié dans le formulaire
+    const docNum=f.number||nextNum(f.type, f.date);
     const doc={id:uid(),number:docNum,status:initStatus,createdAt:Date.now(),...payload,
       ...(f.type==='invoice'?{invoiceType:'direct'}:{})};
     if(f.type==='quote') quotes=[doc,...quotes]; else invoices=[doc,...invoices];
@@ -1231,7 +1244,7 @@ function printDoc(type,id){
     `<tr><td>${eur(v.ht)}</td><td>${rate} %</td><td>${eur(v.tva)}</td></tr>`
   ).join('');
 
-  const rawNum=doc.number.replace(/^(Devis|Facture)\s+/,'');
+  const rawNum=doc.number; // Format direct: D00105 ou 0105
   const docLabel=isInv?'Facture':'Devis';
 
   const addrCo=[co.address,(co.zip||co.city)?[co.zip,co.city].filter(Boolean).join(' '):null].filter(Boolean).join(', ');
