@@ -980,14 +980,23 @@ function renderForm(){
       <!-- ITEMS -->
       <div style="margin-bottom:16px">
         <div class="card-title">Prestations / Articles</div>
-        <div class="items-table" id="items-container">
-          <div class="items-head">
-            <span>Description</span><span>Qté</span><span>Prix unit. (€)</span><span>TVA %</span><span></span>
-          </div>
-          ${f.items.map((it,i)=>itemRow(it,i)).join('')}
+        <div class="items-table">
+          <table>
+            <thead><tr>
+              <th style="width:42%">Description / Détails</th>
+              <th class="r" style="width:60px">Qté</th>
+              <th class="r" style="width:110px">Prix unit. (€)</th>
+              <th class="r" style="width:75px">TVA %</th>
+              <th class="r" style="width:90px">Total</th>
+              <th style="width:32px"></th>
+            </tr></thead>
+            <tbody id="items-tbody">
+              ${f.items.map((it,i)=>itemRow(it,i)).join('')}
+            </tbody>
+          </table>
           <div class="items-foot">
             <button class="btn-text" onclick="addItem()">+ Ajouter une ligne</button>
-            <span class="items-total">Total : ${eur(total(f.items))}</span>
+            <span class="items-total" id="items-total">Total : ${eur(total(f.items))}</span>
           </div>
         </div>
       </div>
@@ -1010,10 +1019,9 @@ function renderForm(){
 
 function itemRow(it,i){
   const lineTotal=(parseFloat(it.qty)||0)*(parseFloat(it.price)||0);
-  const detailId='irow-detail-'+it.id;
   return `<tr id="irow-${it.id}">
     <td style="padding:8px 6px 4px"><input value="${(it.desc||'').replace(/"/g,'&quot;')}" placeholder="Libellé principal..."
-      style="width:100%;border:1px solid transparent;border-radius:6px;background:transparent;outline:none;font-size:12.5px;font-family:'Jost',sans-serif;padding:5px 8px;color:#1A1A2E;font-weight:500;transition:border-color .15s"
+      style="width:100%;border:1px solid transparent;border-radius:6px;background:transparent;outline:none;font-size:12.5px;font-family:inherit;padding:5px 8px;color:#1A1A2E;font-weight:500;transition:border-color .15s"
       onfocus="this.style.borderColor='#C5C0B5'" onblur="this.style.borderColor='transparent'"
       onchange="updateItem('${it.id}','desc',this.value)" oninput="updateItem('${it.id}','desc',this.value)"></td>
     <td class="center"><input type="number" value="${it.qty}" min="0" style="text-align:center"
@@ -1031,12 +1039,10 @@ function itemRow(it,i){
         ${formState.items.length<=1?'disabled':''}>×</button>
     </td>
   </tr>
-  <tr id="${detailId}" style="background:#FAFAF8">
+  <tr id="irow-detail-${it.id}" style="background:#FAFAF8">
     <td colspan="6" style="padding:0 6px 7px 6px">
       <textarea placeholder="Détails (dates, intervenants…)" rows="2"
-        style="width:100%;border:1px solid transparent;border-radius:6px;background:transparent;
-               outline:none;font-size:11.5px;font-family:'Jost',sans-serif;color:#666;
-               resize:vertical;padding:4px 8px;line-height:1.6;transition:border-color .15s"
+        style="width:100%;border:1px solid transparent;border-radius:6px;background:transparent;outline:none;font-size:11.5px;font-family:inherit;color:#666;resize:vertical;padding:4px 8px;line-height:1.6;transition:border-color .15s"
         onfocus="this.style.borderColor='#C5C0B5';this.style.background='#F7F5F0'"
         onblur="this.style.borderColor='transparent';this.style.background='transparent'"
         onchange="updateItem('${it.id}','detail',this.value)"
@@ -1049,55 +1055,36 @@ function itemRow(it,i){
 function updateItem(id,key,val){
   const it=formState.items.find(i=>i.id===id);
   if(it) it[key]=val;
-  // Update total display
-  const foot=document.querySelector('.items-foot .items-total');
-  if(foot) foot.textContent='Total : '+eur(total(formState.items));
+  updateTotalDisplay();
+}
+function updateLineTotal(id){
+  const it=formState.items.find(i=>i.id===id);
+  if(!it)return;
+  const el=document.getElementById('lt-'+id);
+  if(el) el.textContent=eur((parseFloat(it.qty)||0)*(parseFloat(it.price)||0));
+  updateTotalDisplay();
+}
+function updateTotalDisplay(){
+  const el=document.getElementById('items-total');
+  if(el) el.textContent='Total : '+eur(total(formState.items));
 }
 
 function addItem(){
   const it={id:uid(),desc:'',detail:'',qty:1,price:0,tva:0};
   formState.items.push(it);
   const tbody=document.getElementById('items-tbody');
-  if(tbody) tbody.appendChild(createRowEl(it));
+  if(!tbody)return;
+  const tmp=document.createElement('tbody');
+  tmp.innerHTML=itemRow(it,0);
+  while(tmp.firstChild) tbody.appendChild(tmp.firstChild);
   updateTotalDisplay();
 }
 
 function createRowEl(it){
-  const tr=document.createElement('tr');
-  tr.id='irow-'+it.id;
-  tr.innerHTML=`
-    <td style="padding:8px 6px 4px"><input value="" placeholder="Libellé principal..."
-      style="width:100%;border:1px solid transparent;border-radius:6px;background:transparent;outline:none;font-size:12.5px;font-family:'Jost',sans-serif;padding:5px 8px;color:#1A1A2E;font-weight:500;transition:border-color .15s"
-      onfocus="this.style.borderColor='#C5C0B5'" onblur="this.style.borderColor='transparent'"
-      onchange="updateItem('${it.id}','desc',this.value)" oninput="updateItem('${it.id}','desc',this.value)"></td>
-    <td class="center"><input type="number" value="1" min="0" style="text-align:center"
-      onchange="updateItem('${it.id}','qty',this.value);updateLineTotal('${it.id}')"
-      oninput="updateItem('${it.id}','qty',this.value);updateLineTotal('${it.id}')"></td>
-    <td class="right"><input type="number" value="0" min="0" step="0.01" style="text-align:right"
-      onchange="updateItem('${it.id}','price',this.value);updateLineTotal('${it.id}')"
-      oninput="updateItem('${it.id}','price',this.value);updateLineTotal('${it.id}')"></td>
-    <td class="center"><input type="number" value="0" min="0" max="100" style="text-align:center"
-      onchange="updateItem('${it.id}','tva',this.value)" oninput="updateItem('${it.id}','tva',this.value)"></td>
-    <td class="total-cell" id="lt-${it.id}">0,00 \u20ac</td>
-    <td style="text-align:center;padding:4px">
-      <button onclick="removeItem('${it.id}')" style="background:none;border:none;cursor:pointer;color:#DC2626;font-size:16px;line-height:1">\xd7</button>
-    </td>`;
-  const tr2=document.createElement('tr');
-  tr2.id='irow-detail-'+it.id;
-  tr2.style.background='#FAFAF8';
-  tr2.innerHTML=`
-    <td colspan="6" style="padding:0 6px 7px 6px">
-      <textarea placeholder="Détails (dates, intervenants\u2026)" rows="2"
-        style="width:100%;border:1px solid transparent;border-radius:6px;background:transparent;
-               outline:none;font-size:11.5px;font-family:'Jost',sans-serif;color:#666;
-               resize:vertical;padding:4px 8px;line-height:1.6;transition:border-color .15s"
-        onfocus="this.style.borderColor='#C5C0B5';this.style.background='#F7F5F0'"
-        onblur="this.style.borderColor='transparent';this.style.background='transparent'"
-        onchange="updateItem('${it.id}','detail',this.value)"
-        oninput="updateItem('${it.id}','detail',this.value)"></textarea>
-    </td>`;
+  const tmp=document.createElement('tbody');
+  tmp.innerHTML=itemRow(it,0);
   const frag=document.createDocumentFragment();
-  frag.appendChild(tr);frag.appendChild(tr2);
+  while(tmp.firstChild) frag.appendChild(tmp.firstChild);
   return frag;
 }
 
