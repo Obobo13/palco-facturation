@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PALCO Facturation v1.3</title>
+<title>PALCO Facturation v1.4</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -284,7 +284,7 @@ input[type=number]::-webkit-inner-spin-button{opacity:.5}
     <div class="sb-logo">
       <img id="logo-app" alt="PALCO">
       <div class="name">PALCO Inc</div>
-      <div class="sub">Facturation v1.3</div>
+      <div class="sub">Facturation v1.4</div>
     </div>
     <div class="sb-nav">
       <button class="sb-btn active" onclick="nav('dashboard')" id="nav-dashboard"><span class="sb-icon">⊞</span>Tableau de bord</button>
@@ -1009,13 +1009,41 @@ function renderForm(){
 }
 
 function itemRow(it,i){
-  return `<div class="items-row" id="irow-${it.id}">
-    <input value="${it.desc||''}" placeholder="Description..." onchange="updateItem('${it.id}','desc',this.value)" oninput="updateItem('${it.id}','desc',this.value)">
-    <input type="number" value="${it.qty}" min="0" style="text-align:center" onchange="updateItem('${it.id}','qty',this.value)" oninput="updateItem('${it.id}','qty',this.value)">
-    <input type="number" value="${it.price}" min="0" step="0.01" style="text-align:right" onchange="updateItem('${it.id}','price',this.value)" oninput="updateItem('${it.id}','price',this.value)">
-    <input type="number" value="${it.tva||0}" min="0" max="100" style="text-align:center" onchange="updateItem('${it.id}','tva',this.value)" oninput="updateItem('${it.id}','tva',this.value)">
-    <button onclick="removeItem('${it.id}')" style="background:none;border:none;cursor:pointer;color:#DC2626;font-size:16px;opacity:${formState.items.length>1?1:0.2}" ${formState.items.length<=1?'disabled':''}>×</button>
-  </div>`;
+  const lineTotal=(parseFloat(it.qty)||0)*(parseFloat(it.price)||0);
+  const detailId='irow-detail-'+it.id;
+  return `<tr id="irow-${it.id}">
+    <td style="padding:8px 6px 4px"><input value="${(it.desc||'').replace(/"/g,'&quot;')}" placeholder="Libellé principal..."
+      style="width:100%;border:1px solid transparent;border-radius:6px;background:transparent;outline:none;font-size:12.5px;font-family:'Jost',sans-serif;padding:5px 8px;color:#1A1A2E;font-weight:500;transition:border-color .15s"
+      onfocus="this.style.borderColor='#C5C0B5'" onblur="this.style.borderColor='transparent'"
+      onchange="updateItem('${it.id}','desc',this.value)" oninput="updateItem('${it.id}','desc',this.value)"></td>
+    <td class="center"><input type="number" value="${it.qty}" min="0" style="text-align:center"
+      onchange="updateItem('${it.id}','qty',this.value);updateLineTotal('${it.id}')"
+      oninput="updateItem('${it.id}','qty',this.value);updateLineTotal('${it.id}')"></td>
+    <td class="right"><input type="number" value="${it.price}" min="0" step="0.01" style="text-align:right"
+      onchange="updateItem('${it.id}','price',this.value);updateLineTotal('${it.id}')"
+      oninput="updateItem('${it.id}','price',this.value);updateLineTotal('${it.id}')"></td>
+    <td class="center"><input type="number" value="${it.tva||0}" min="0" max="100" style="text-align:center"
+      onchange="updateItem('${it.id}','tva',this.value)" oninput="updateItem('${it.id}','tva',this.value)"></td>
+    <td class="total-cell" id="lt-${it.id}">${eur(lineTotal)}</td>
+    <td style="text-align:center;padding:4px">
+      <button onclick="removeItem('${it.id}')"
+        style="background:none;border:none;cursor:pointer;color:#DC2626;font-size:16px;line-height:1;opacity:${formState.items.length>1?1:0.2}"
+        ${formState.items.length<=1?'disabled':''}>×</button>
+    </td>
+  </tr>
+  <tr id="${detailId}" style="background:#FAFAF8">
+    <td colspan="6" style="padding:0 6px 7px 6px">
+      <textarea placeholder="Détails (dates, intervenants…)" rows="2"
+        style="width:100%;border:1px solid transparent;border-radius:6px;background:transparent;
+               outline:none;font-size:11.5px;font-family:'Jost',sans-serif;color:#666;
+               resize:vertical;padding:4px 8px;line-height:1.6;transition:border-color .15s"
+        onfocus="this.style.borderColor='#C5C0B5';this.style.background='#F7F5F0'"
+        onblur="this.style.borderColor='transparent';this.style.background='transparent'"
+        onchange="updateItem('${it.id}','detail',this.value)"
+        oninput="updateItem('${it.id}','detail',this.value)"
+      >${it.detail||''}</textarea>
+    </td>
+  </tr>`;
 }
 
 function updateItem(id,key,val){
@@ -1027,37 +1055,60 @@ function updateItem(id,key,val){
 }
 
 function addItem(){
-  formState.items.push({id:uid(),desc:'',qty:1,price:0,tva:0});
-  const container=document.getElementById('items-container');
-  const foot=container.querySelector('.items-foot');
-  const row=document.createElement('div');
-  const i=formState.items.length-1;
-  const it=formState.items[i];
-  row.outerHTML; // just trigger
-  container.insertBefore(createRowEl(it),foot);
-  foot.querySelector('.items-total').textContent='Total : '+eur(total(formState.items));
+  const it={id:uid(),desc:'',detail:'',qty:1,price:0,tva:0};
+  formState.items.push(it);
+  const tbody=document.getElementById('items-tbody');
+  if(tbody) tbody.appendChild(createRowEl(it));
+  updateTotalDisplay();
 }
 
 function createRowEl(it){
-  const div=document.createElement('div');
-  div.className='items-row';
-  div.id='irow-'+it.id;
-  div.innerHTML=`
-    <input value="${it.desc||''}" placeholder="Description..." onchange="updateItem('${it.id}','desc',this.value)" oninput="updateItem('${it.id}','desc',this.value)">
-    <input type="number" value="${it.qty}" min="0" style="text-align:center" onchange="updateItem('${it.id}','qty',this.value)" oninput="updateItem('${it.id}','qty',this.value)">
-    <input type="number" value="${it.price}" min="0" step="0.01" style="text-align:right" onchange="updateItem('${it.id}','price',this.value)" oninput="updateItem('${it.id}','price',this.value)">
-    <input type="number" value="${it.tva||0}" min="0" max="100" style="text-align:center" onchange="updateItem('${it.id}','tva',this.value)" oninput="updateItem('${it.id}','tva',this.value)">
-    <button onclick="removeItem('${it.id}')" style="background:none;border:none;cursor:pointer;color:#DC2626;font-size:16px">×</button>`;
-  return div;
+  const tr=document.createElement('tr');
+  tr.id='irow-'+it.id;
+  tr.innerHTML=`
+    <td style="padding:8px 6px 4px"><input value="" placeholder="Libellé principal..."
+      style="width:100%;border:1px solid transparent;border-radius:6px;background:transparent;outline:none;font-size:12.5px;font-family:'Jost',sans-serif;padding:5px 8px;color:#1A1A2E;font-weight:500;transition:border-color .15s"
+      onfocus="this.style.borderColor='#C5C0B5'" onblur="this.style.borderColor='transparent'"
+      onchange="updateItem('${it.id}','desc',this.value)" oninput="updateItem('${it.id}','desc',this.value)"></td>
+    <td class="center"><input type="number" value="1" min="0" style="text-align:center"
+      onchange="updateItem('${it.id}','qty',this.value);updateLineTotal('${it.id}')"
+      oninput="updateItem('${it.id}','qty',this.value);updateLineTotal('${it.id}')"></td>
+    <td class="right"><input type="number" value="0" min="0" step="0.01" style="text-align:right"
+      onchange="updateItem('${it.id}','price',this.value);updateLineTotal('${it.id}')"
+      oninput="updateItem('${it.id}','price',this.value);updateLineTotal('${it.id}')"></td>
+    <td class="center"><input type="number" value="0" min="0" max="100" style="text-align:center"
+      onchange="updateItem('${it.id}','tva',this.value)" oninput="updateItem('${it.id}','tva',this.value)"></td>
+    <td class="total-cell" id="lt-${it.id}">0,00 \u20ac</td>
+    <td style="text-align:center;padding:4px">
+      <button onclick="removeItem('${it.id}')" style="background:none;border:none;cursor:pointer;color:#DC2626;font-size:16px;line-height:1">\xd7</button>
+    </td>`;
+  const tr2=document.createElement('tr');
+  tr2.id='irow-detail-'+it.id;
+  tr2.style.background='#FAFAF8';
+  tr2.innerHTML=`
+    <td colspan="6" style="padding:0 6px 7px 6px">
+      <textarea placeholder="Détails (dates, intervenants\u2026)" rows="2"
+        style="width:100%;border:1px solid transparent;border-radius:6px;background:transparent;
+               outline:none;font-size:11.5px;font-family:'Jost',sans-serif;color:#666;
+               resize:vertical;padding:4px 8px;line-height:1.6;transition:border-color .15s"
+        onfocus="this.style.borderColor='#C5C0B5';this.style.background='#F7F5F0'"
+        onblur="this.style.borderColor='transparent';this.style.background='transparent'"
+        onchange="updateItem('${it.id}','detail',this.value)"
+        oninput="updateItem('${it.id}','detail',this.value)"></textarea>
+    </td>`;
+  const frag=document.createDocumentFragment();
+  frag.appendChild(tr);frag.appendChild(tr2);
+  return frag;
 }
 
 function removeItem(id){
   if(formState.items.length<=1)return;
   formState.items=formState.items.filter(i=>i.id!==id);
-  const row=document.getElementById('irow-'+id);
-  if(row)row.remove();
-  const foot=document.querySelector('.items-foot .items-total');
-  if(foot)foot.textContent='Total : '+eur(total(formState.items));
+  ['irow-'+id,'irow-detail-'+id].forEach(rid=>{
+    const el=document.getElementById(rid);
+    if(el)el.remove();
+  });
+  updateTotalDisplay();
 }
 
 function submitForm(){
@@ -1173,7 +1224,10 @@ function printDoc(type,id){
 
   const rows=doc.items.map(it=>`
     <tr>
-      <td class="desc"><strong>${it.desc||''}</strong></td>
+      <td class="desc">
+        <strong>${it.desc||''}</strong>
+        ${it.detail?`<div style="font-size:11px;color:#555;margin-top:4px;line-height:1.7;white-space:pre-line">${it.detail}</div>`:''}
+      </td>
       <td class="num">${parseFloat(it.qty)||0}</td>
       <td class="num">${eur(it.price)}</td>
       <td class="num">${parseFloat(it.tva)||0} %</td>
