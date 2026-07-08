@@ -748,7 +748,7 @@ function renderDashboard(){
           recent.map(d=>`
             <div class="activity-row">
               <div>
-                <span style="font-family:monospace;font-size:12px;font-weight:600">${d.number}</span>
+                <span style="font-family:monospace;font-size:12px;font-weight:600">${d._t==="quote"?"Devis":"Facture"} ${d.number}</span>
                 <span style="color:#aaa;font-size:12px;margin-left:8px">${d.client?.name||'Sans client'}</span>
               </div>
               <div style="display:flex;align-items:center;gap:10px">
@@ -796,7 +796,7 @@ function renderQuotes(){
         </tr></thead>
         <tbody>
           ${quotes.map(q=>`<tr>
-            <td class="mono">${q.number}</td>
+            <td class="mono">Devis ${q.number}</td>
             <td>${q.client?.name||'<span style="color:#ddd">—</span>'}</td>
             <td style="color:#aaa">${fmtDate(q.date)}</td>
             <td style="color:#aaa">${fmtDate(q.validUntil)}</td>
@@ -832,7 +832,7 @@ function renderInvoices(){
           ${invoices.map(i=>{
             const locked=!['en_cours','draft'].includes(i.status);
             return `<tr>
-              <td class="mono">${i.number}</td>
+              <td class="mono">Facture ${i.number}</td>
               <td>${i.client?.name||'<span style="color:#ddd">—</span>'}</td>
               <td style="color:#aaa">${fmtDate(i.date)}</td>
               <td style="color:#aaa">${fmtDate(i.dueDate)}</td>
@@ -982,7 +982,7 @@ function renderForm(){
     <div>
       <div class="grid grid-4" style="margin-bottom:18px">
         <label class="field">
-          <span>Numéro</span>
+          <span>Numéro ${isInv?"(Facture)":"(Devis)"}</span>
           <input id="f-number" value="${f.number||''}"
             style="font-family:monospace;font-weight:600;letter-spacing:.5px"
             onchange="formState.number=this.value.trim()"
@@ -1367,7 +1367,7 @@ td.bold{font-weight:500}
     </div>
   </div>
   <div class="h-right">
-    <div class="doc-title">${doc.number}</div>
+    <div class="doc-title">${isInv?"Facture N°":"Devis"} ${doc.number}</div>
     <div class="doc-dates" style="margin-top:6px">
       <span class="lbl">Date d'émission</span> : ${fmtDate(doc.date)}<br>
       ${isInv
